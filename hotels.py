@@ -49,8 +49,9 @@ def goto_url(url: str, page: Page, page_load_state: str = "load") -> None:
 
 
 def get_file_content(filename: str):
-    # check if we have an accounts.csv file
+    # check if file exists
     if not Path(filename).exists():
+        # prompt for a filename if the filename given cant be foun
         filename = Path(input("\aEnter a valid filename: "))
         # if user inputs a non existing filename, raise an exception
         if not Path(filename).exists():
@@ -61,9 +62,15 @@ def get_file_content(filename: str):
     return content
 
 
-# playwright = sync_playwright().start()
-# browser = playwright.chromium.launch(headless=False, slow_mo=250)
-# page = get_page_object(browser)
-# goto_url(TRIP_ADVISOR_HOMEPAGE, page)
-
 places = get_file_content("places.txt")
+logger.info(f"Found {len(places)} places in file provided.")
+# TODO: only open browser if we have places to work with
+
+playwright = sync_playwright().start()
+browser = playwright.chromium.launch(headless=False, slow_mo=250)
+page = get_page_object(browser)
+
+goto_url(TRIP_ADVISOR_HOMEPAGE, page)
+form_role_search = page.query_selector("form[role='search']")
+form_role_search.
+# form_role_search.query_selector("input[type='search']").type("hello")
