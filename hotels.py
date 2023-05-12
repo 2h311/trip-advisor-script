@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 
-BROWSER_TIMEOUT = 45 * 1000
+BROWSER_TIMEOUT = 25 * 1000
 TRIP_ADVISOR_HOMEPAGE = "https://www.tripadvisor.com"
 
 
@@ -71,6 +71,24 @@ browser = playwright.chromium.launch(headless=False, slow_mo=250)
 page = get_page_object(browser)
 
 goto_url(TRIP_ADVISOR_HOMEPAGE, page)
+
+page.query_selector("footer").scroll_into_view_if_needed()
+
 form_role_search = page.query_selector("form[role='search']")
-form_role_search.
-# form_role_search.query_selector("input[type='search']").type("hello")
+search = form_role_search.query_selector("input[type='search']")
+search.fill("ohio hotels")
+
+typeahead_results = page.query_selector("div#typeahead_results")
+href = typeahead_results.query_selector("a").get_attribute("href")
+goto_url(f"{TRIP_ADVISOR_HOMEPAGE}{href}", page)
+
+listing_hrefs = list()
+listings = page.query_selector_all("div.listItem")
+while listings:
+    listing = listings.pop()
+    listing_href = listing.query_selector("div.listing_title a").get_attribute("href")
+    logger.debug(listing_href)
+    listing_hrefs.append(listing_href)
+
+
+ listing_hrefs.pop()
