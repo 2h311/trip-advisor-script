@@ -1,3 +1,4 @@
+import time
 import logging
 from pathlib import Path
 from typing import Optional
@@ -62,6 +63,12 @@ def get_file_content(filename: str):
     return content
 
 
+def get_text_from_page_element(page_element: ElementHandle) -> str:
+    response = ""
+    if page_element:
+        response = page_element.text_content().strip()
+    return response
+
 places = get_file_content("places.txt")
 logger.info(f"Found {len(places)} places in file provided.")
 # TODO: only open browser if we have places to work with
@@ -78,6 +85,7 @@ form_role_search = page.query_selector("form[role='search']")
 search = form_role_search.query_selector("input[type='search']")
 search.fill("ohio hotels")
 
+time.sleep(2.5)
 typeahead_results = page.query_selector("div#typeahead_results")
 href = typeahead_results.query_selector("a").get_attribute("href")
 goto_url(f"{TRIP_ADVISOR_HOMEPAGE}{href}", page)
@@ -91,4 +99,26 @@ while listings:
     listing_hrefs.append(listing_href)
 
 
- listing_hrefs.pop()
+listing_uri = listing_hrefs.pop()
+goto_url(f"{TRIP_ADVISOR_HOMEPAGE}{listing_uri}", page)
+
+
+h1_heading = page.query_selector("h1#HEADING")
+hotel_name = get_text_from_page_element(h1_heading)
+
+anchor_reviews = page.query_selector("a[href='#REVIEWS']")
+hotel_number_of_reviews = get_text_from_page_element(anchor_reviews)
+
+span_location = page.query_selector("span.map-pin-fill + span")
+hotel_address = get_text_from_page_element(span_location)
+
+url_hotel = page.query_selector('div[data-blcontact*="URL_HOTEL"]')
+hotel_website = url_hotel.query_selector("a").get_attribute("href")
+
+url_number = page.query_selector('div[data-blcontact*="PHONE"]')
+hotel_phone = get_text_from_page_element(url_number)
+
+photo_viewer = page.query_selector('div[data-section-signature="photo_viewer"]')
+images = photo_viewer.query_selector_all("img")
+
+images[0].get_attribute("src")
