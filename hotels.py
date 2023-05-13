@@ -1,9 +1,11 @@
 import time
+import base64
 import logging
 from pathlib import Path
 from typing import Optional
 from typing import Generator
 
+import requests
 from playwright.sync_api import sync_playwright
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from playwright.sync_api._generated import Page
@@ -16,7 +18,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 
-BROWSER_TIMEOUT = 25 * 1000
+BROWSER_TIMEOUT = 32 * 1000
 TRIP_ADVISOR_HOMEPAGE = "https://www.tripadvisor.com"
 
 
@@ -92,17 +94,16 @@ href = typeahead_results.query_selector("a").get_attribute("href")
 goto_url(f"{TRIP_ADVISOR_HOMEPAGE}{href}", page)
 
 listing_hrefs = list()
-listings = page.query_selector_all("div.listItem")
+listings = page.query_selector_all("[class*='listItem']")
 while listings:
     listing = listings.pop()
-    listing_href = listing.query_selector("div.listing_title a").get_attribute("href")
+    listing_href = listing.query_selector("a").get_attribute("href")
     logger.debug(listing_href)
     listing_hrefs.append(listing_href)
 
 
 listing_uri = listing_hrefs.pop()
-goto_url(f"{TRIP_ADVISOR_HOMEPAGE}{listing_uri}", page)
-
+goto_url(f"{TRIP_ADVISOR_HOMEPAGE}{listing_uri}", page, "networkidle")
 
 h1_heading = page.query_selector("h1#HEADING")
 hotel_name = get_text_from_page_element(h1_heading)
@@ -110,7 +111,8 @@ hotel_name = get_text_from_page_element(h1_heading)
 anchor_reviews = page.query_selector("a[href='#REVIEWS']")
 hotel_number_of_reviews = get_text_from_page_element(anchor_reviews)
 
-span_location = page.query_selector("span.map-pin-fill + span")
+span_location = page.query_selector("span.map-pin-fill + span")    # before uploading to cloud
+
 hotel_address = get_text_from_page_element(span_location)
 
 url_hotel = page.query_selector('div[data-blcontact*="URL_HOTEL"]')
@@ -122,4 +124,11 @@ hotel_phone = get_text_from_page_element(url_number)
 photo_viewer = page.query_selector('div[data-section-signature="photo_viewer"]')
 images = photo_viewer.query_selector_all("img")
 
-images[0].get_attribute("src")
+# src = images[0].get_attribute("src")
+
+def get_image_base64_string(src: str) -> bytes:
+    # convert jpeg image to base64 string we can upload to cloud database
+    response = requests.get(src)
+    if not response.ok:
+        response.raise_for_status()
+    return base64.b64encode(response.content)
