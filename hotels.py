@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 
-BROWSER_TIMEOUT = 32 * 1000
+BROWSER_TIMEOUT = 45 * 1000
 TRIP_ADVISOR_HOMEPAGE = "https://www.tripadvisor.com"
 
 
@@ -111,7 +111,9 @@ hotel_name = get_text_from_page_element(h1_heading)
 anchor_reviews = page.query_selector("a[href='#REVIEWS']")
 hotel_number_of_reviews = get_text_from_page_element(anchor_reviews)
 
-span_location = page.query_selector("span.map-pin-fill + span")    # before uploading to cloud
+span_location = page.query_selector(
+    "span.map-pin-fill + span"
+)  # before uploading to cloud
 
 hotel_address = get_text_from_page_element(span_location)
 
@@ -125,6 +127,7 @@ photo_viewer = page.query_selector('div[data-section-signature="photo_viewer"]')
 images = photo_viewer.query_selector_all("img")
 
 # src = images[0].get_attribute("src")
+
 
 def get_image_base64_string(src: str) -> bytes:
     # convert jpeg image to base64 string we can upload to cloud database
