@@ -1,9 +1,11 @@
 import time
 import base64
 import logging
+import functools
 from pathlib import Path
 from typing import Optional
 from typing import Generator
+from typing import Callable
 
 import requests
 from playwright.sync_api import sync_playwright
@@ -11,6 +13,9 @@ from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from playwright.sync_api._generated import Page
 from playwright.sync_api._generated import BrowserType
 from playwright.sync_api._generated import ElementHandle
+
+from models import Hotel
+from models import HotelFields
 
 
 logging.basicConfig(format="... %(message)s")
@@ -20,6 +25,23 @@ logger.setLevel(logging.DEBUG)
 
 BROWSER_TIMEOUT = 45 * 1000
 TRIP_ADVISOR_HOMEPAGE = "https://www.tripadvisor.com"
+
+
+def retry_wraps(times: int = 3) -> Callable:
+    def retry(function) -> Callable:
+        """tries to run a function after an unsuccessful attempt."""
+
+        @functools.wraps(function)
+        def inner(*args, **kwargs):
+            for _ in range(times):
+                try:
+                    return function(*args, **kwargs)
+                except Exception as err:
+                    logger.error(err)
+
+        return inner
+
+    return retry
 
 
 def get_page_object(browser: BrowserType, proxies_pool: Optional[Generator] = None):
@@ -72,6 +94,19 @@ def get_text_from_page_element(page_element: ElementHandle) -> str:
     return response
 
 
+@retry_wraps()
+def get_image_base64_string(src: str) -> bytes:
+    # convert jpeg image to base64 string we can upload to cloud database
+    logger.info(f"Downloading {src}")
+    response = requests.get(src, timeout=45, stream=True)
+    if not response.ok:
+        response.raise_for_status()
+    logger.debug("Image Download Successful")
+    logger.debug(f"Preparing a base64 string representation of {src}")
+    return base64.b64encode(response.content)
+
+
+hotel_fields = HotelFields()
 places = get_file_content("places.txt")
 logger.info(f"Found {len(places)} places in file provided.")
 # TODO: only open browser if we have places to work with
@@ -104,34 +139,34 @@ while listings:
 
 listing_uri = listing_hrefs.pop()
 goto_url(f"{TRIP_ADVISOR_HOMEPAGE}{listing_uri}", page, "networkidle")
+hotel_dict = dict()
 
 h1_heading = page.query_selector("h1#HEADING")
 hotel_name = get_text_from_page_element(h1_heading)
+hotel_dict[hotel_fields.name] = hotel_name
 
 anchor_reviews = page.query_selector("a[href='#REVIEWS']")
 hotel_number_of_reviews = get_text_from_page_element(anchor_reviews)
+hotel_dict[hotel_fields.reviews] = hotel_number_of_reviews
 
-span_location = page.query_selector(
-    "span.map-pin-fill + span"
-)  # before uploading to cloud
-
+span_location = page.query_selector("span.map-pin-fill + span")
 hotel_address = get_text_from_page_element(span_location)
+hotel_dict[hotel_fields.location] = hotel_address
 
 url_hotel = page.query_selector('div[data-blcontact*="URL_HOTEL"]')
 hotel_website = url_hotel.query_selector("a").get_attribute("href")
+hotel_dict[hotel_fields.website] = hotel_website
 
 url_number = page.query_selector('div[data-blcontact*="PHONE"]')
 hotel_phone = get_text_from_page_element(url_number)
+hotel_dict[hotel_fields.phone] = hotel_phone
 
+images = list()
 photo_viewer = page.query_selector('div[data-section-signature="photo_viewer"]')
-images = photo_viewer.query_selector_all("img")
+image_links = photo_viewer.query_selector_all("img")
+for image_link in image_links:
+    src = image_link.get_attribute("src")
+    images.append(get_image_base64_string(src))
+hotel_dict[hotel_fields.images] = images
 
-# src = images[0].get_attribute("src")
-
-
-def get_image_base64_string(src: str) -> bytes:
-    # convert jpeg image to base64 string we can upload to cloud database
-    response = requests.get(src)
-    if not response.ok:
-        response.raise_for_status()
-    return base64.b64encode(response.content)
+# database.tetsing.insert_one(hotel_dict)

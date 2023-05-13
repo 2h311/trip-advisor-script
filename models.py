@@ -8,12 +8,14 @@ class HotelFields:
     website: str = "Website"
     phone: str = "Phone"
     images: str = "Images"
-
+    location: str = "Location"
 
 @dataclass
 class Hotel:
+    # this is for data validation
     name: str
     reviews: str
     website: str
     phone: str
+    location: str
     images: list[bytes]
