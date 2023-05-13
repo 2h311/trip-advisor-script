@@ -69,6 +69,7 @@ def get_text_from_page_element(page_element: ElementHandle) -> str:
         response = page_element.text_content().strip()
     return response
 
+
 places = get_file_content("places.txt")
 logger.info(f"Found {len(places)} places in file provided.")
 # TODO: only open browser if we have places to work with
