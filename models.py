@@ -10,6 +10,7 @@ class HotelFields:
     images: str = "Images"
     location: str = "Location"
 
+
 @dataclass
 class Hotel:
     # this is for data validation

@@ -16,6 +16,7 @@ from playwright.sync_api._generated import ElementHandle
 
 from models import Hotel
 from models import HotelFields
+from database import database
 
 
 logging.basicConfig(format="... %(message)s")
@@ -106,6 +107,48 @@ def get_image_base64_string(src: str) -> bytes:
     return base64.b64encode(response.content)
 
 
+def get_hotel_name(page: Page, hotel_dict: dict) -> None:
+    h1_heading = page.query_selector("h1#HEADING")
+    hotel_name = get_text_from_page_element(h1_heading)
+    hotel_dict[hotel_fields.name] = hotel_name
+
+
+def get_hotel_reviews(page: Page, hotel_dict: dict) -> None:
+    anchor_reviews = page.query_selector("a[href='#REVIEWS']")
+    hotel_number_of_reviews = get_text_from_page_element(anchor_reviews)
+    hotel_dict[hotel_fields.reviews] = hotel_number_of_reviews
+
+
+def get_hotel_location(page: Page, hotel_dict: dict) -> None:
+    span_location = page.query_selector("span.map-pin-fill + span")
+    hotel_address = get_text_from_page_element(span_location)
+    hotel_dict[hotel_fields.location] = hotel_address
+
+
+def get_hotel_website(page: Page, hotel_dict: dict) -> None:
+    url_hotel = page.query_selector('div[data-blcontact*="URL_HOTEL"]')
+    hotel_website = url_hotel.query_selector("a").get_attribute("href")
+    hotel_dict[hotel_fields.website] = hotel_website
+
+
+def get_hotel_phone(page: Page, hotel_dict: dict) -> None:
+    url_number = page.query_selector('div[data-blcontact*="PHONE"]')
+    hotel_phone = get_text_from_page_element(url_number)
+    hotel_dict[hotel_fields.phone] = hotel_phone
+
+
+def get_hotel_images(page: Page, hotel_dict: dict) -> None:
+    images = list()
+    photo_viewer = page.query_selector('div[data-section-signature="photo_viewer"]')
+    image_links = photo_viewer.query_selector_all("img")
+    for image_link in image_links[:5]:
+        src = image_link.get_attribute("src")
+        byte_string = get_image_base64_string(src)
+        if byte_string:
+            images.append(byte_string)
+    hotel_dict[hotel_fields.images] = images
+
+
 hotel_fields = HotelFields()
 places = get_file_content("places.txt")
 logger.info(f"Found {len(places)} places in file provided.")
@@ -121,7 +164,7 @@ page.query_selector("footer").scroll_into_view_if_needed()
 
 form_role_search = page.query_selector("form[role='search']")
 search = form_role_search.query_selector("input[type='search']")
-search.fill("ohio hotels")
+search.fill("alabama hotels")
 
 time.sleep(2.5)
 typeahead_results = page.query_selector("div#typeahead_results")
@@ -137,36 +180,15 @@ while listings:
     listing_hrefs.append(listing_href)
 
 
-listing_uri = listing_hrefs.pop()
-goto_url(f"{TRIP_ADVISOR_HOMEPAGE}{listing_uri}", page, "networkidle")
+listing_uri = listing_hrefs.pop(0)
+goto_url(f"{TRIP_ADVISOR_HOMEPAGE}{listing_uri}", page, "domcontentloaded")
 hotel_dict = dict()
 
-h1_heading = page.query_selector("h1#HEADING")
-hotel_name = get_text_from_page_element(h1_heading)
-hotel_dict[hotel_fields.name] = hotel_name
+get_hotel_name(page, hotel_dict)
+get_hotel_reviews(page, hotel_dict)
+get_hotel_location(page, hotel_dict)
+get_hotel_website(page, hotel_dict)
+get_hotel_phone(page, hotel_dict)
+get_hotel_images(page, hotel_dict)
 
-anchor_reviews = page.query_selector("a[href='#REVIEWS']")
-hotel_number_of_reviews = get_text_from_page_element(anchor_reviews)
-hotel_dict[hotel_fields.reviews] = hotel_number_of_reviews
-
-span_location = page.query_selector("span.map-pin-fill + span")
-hotel_address = get_text_from_page_element(span_location)
-hotel_dict[hotel_fields.location] = hotel_address
-
-url_hotel = page.query_selector('div[data-blcontact*="URL_HOTEL"]')
-hotel_website = url_hotel.query_selector("a").get_attribute("href")
-hotel_dict[hotel_fields.website] = hotel_website
-
-url_number = page.query_selector('div[data-blcontact*="PHONE"]')
-hotel_phone = get_text_from_page_element(url_number)
-hotel_dict[hotel_fields.phone] = hotel_phone
-
-images = list()
-photo_viewer = page.query_selector('div[data-section-signature="photo_viewer"]')
-image_links = photo_viewer.query_selector_all("img")
-for image_link in image_links:
-    src = image_link.get_attribute("src")
-    images.append(get_image_base64_string(src))
-hotel_dict[hotel_fields.images] = images
-
-# database.tetsing.insert_one(hotel_dict)
+database.tetsing.insert_one(hotel_dict)
