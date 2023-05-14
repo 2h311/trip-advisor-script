@@ -6,8 +6,6 @@ dallas
 denver
 detroit
 houston
-las vegas
-los angeles
 miami
 minneapolis
 new york
@@ -19,5 +17,4 @@ raleigh
 sacramento
 san diego
 seattle
-sf bayarea
 washington dc

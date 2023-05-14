@@ -65,7 +65,7 @@ def get_page_object(browser: BrowserType, proxies_pool: Optional[Generator] = No
     return page
 
 
-# @retry_wraps()
+@retry_wraps()
 def goto_url(url: str, page: Page, page_load_state: str = "load") -> None:
     logger.info(f"Visiting the url -> {url}")
     page.wait_for_load_state(page_load_state)
@@ -127,7 +127,9 @@ def get_hotel_location(page: Page, hotel_dict: dict) -> None:
 
 def get_hotel_website(page: Page, hotel_dict: dict) -> None:
     url_hotel = page.query_selector('div[data-blcontact*="URL_HOTEL"]')
-    hotel_website = url_hotel.query_selector("a").get_attribute("href")
+    hotel_website = None
+    if url_hotel:
+        hotel_website = url_hotel.query_selector("a").get_attribute("href")
     hotel_dict[hotel_fields.website] = hotel_website
 
 
@@ -149,9 +151,38 @@ def get_hotel_images(page: Page, hotel_dict: dict) -> None:
     hotel_dict[hotel_fields.images] = images
 
 
+def get_all_listings_from_page(page: Page) -> list[str | None]:
+    listing_hrefs = list()
+    listings = page.query_selector_all("[class*='listItem']")
+    while listings:
+        listing = listings.pop()
+        listing_href = listing.query_selector("a").get_attribute("href")
+        logger.debug(listing_href)
+        listing_hrefs.append(listing_href)
+    return listing_hrefs
+
+
+def get_hotel_data(listing_hrefs: list, page: Page) -> None:
+    while listing_hrefs:
+        hotel_dict = dict()
+        listing_uri = listing_hrefs.pop()
+        goto_url(f"{TRIP_ADVISOR_HOMEPAGE}{listing_uri}", page, "domcontentloaded")
+
+        get_hotel_name(page, hotel_dict)
+        get_hotel_reviews(page, hotel_dict)
+        get_hotel_location(page, hotel_dict)
+        get_hotel_website(page, hotel_dict)
+        get_hotel_phone(page, hotel_dict)
+        get_hotel_images(page, hotel_dict)
+        # TODO: remove the hardcoded document name
+        # put it in the .env file, like the database name
+        database[f"tetsing{place}"].insert_one(hotel_dict)
+
+
 hotel_fields = HotelFields()
 places = get_file_content("places.txt")
-logger.info(f"Found {len(places)} places in file provided.")
+place = places[1]
+# logger.info(f"Found {len(places)} places in file provided.")
 # TODO: only open browser if we have places to work with
 
 playwright = sync_playwright().start()
@@ -164,31 +195,12 @@ page.query_selector("footer").scroll_into_view_if_needed()
 
 form_role_search = page.query_selector("form[role='search']")
 search = form_role_search.query_selector("input[type='search']")
-search.fill("alabama hotels")
+search.fill(f"{place} hotels")
 
 time.sleep(2.5)
 typeahead_results = page.query_selector("div#typeahead_results")
 href = typeahead_results.query_selector("a").get_attribute("href")
 goto_url(f"{TRIP_ADVISOR_HOMEPAGE}{href}", page)
 
-listing_hrefs = list()
-listings = page.query_selector_all("[class*='listItem']")
-while listings:
-    listing = listings.pop()
-    listing_href = listing.query_selector("a").get_attribute("href")
-    logger.debug(listing_href)
-    listing_hrefs.append(listing_href)
-
-
-listing_uri = listing_hrefs.pop(0)
-goto_url(f"{TRIP_ADVISOR_HOMEPAGE}{listing_uri}", page, "domcontentloaded")
-hotel_dict = dict()
-
-get_hotel_name(page, hotel_dict)
-get_hotel_reviews(page, hotel_dict)
-get_hotel_location(page, hotel_dict)
-get_hotel_website(page, hotel_dict)
-get_hotel_phone(page, hotel_dict)
-get_hotel_images(page, hotel_dict)
-
-database.tetsing.insert_one(hotel_dict)
+hrefs = get_all_listings_from_page(page)
+get_hotel_data(hrefs, page)
