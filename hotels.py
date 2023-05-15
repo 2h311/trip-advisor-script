@@ -179,29 +179,32 @@ def get_hotel_data(listing_hrefs: list, page: Page) -> None:
         database[f"tetsing{place}"].insert_one(hotel_dict)
 
 
+def fill_place_in_form(place: str, page: Page) -> None:
+    goto_url(TRIP_ADVISOR_HOMEPAGE, page, "domcontentloaded")
+    time.sleep(1.5)
+    page.query_selector("footer").scroll_into_view_if_needed()
+    time.sleep(2)
+
+    form_role_search = page.query_selector("form[role='search']")
+    search = form_role_search.query_selector("input[type='search']")
+    search.fill(f"{place} hotels")
+    time.sleep(5)
+
+    typeahead_results = page.query_selector("div#typeahead_results")
+    href = typeahead_results.query_selector("a").get_attribute("href")
+    goto_url(f"{TRIP_ADVISOR_HOMEPAGE}{href}", page)
+
+    hrefs = get_all_listings_from_page(page)
+    get_hotel_data(hrefs, page)
+
+
+def main() -> None:
+    place = get_file_content("places.txt")[3]
+    playwright = sync_playwright().start()
+    browser = playwright.chromium.launch(headless=False, slow_mo=250)
+    page = get_page_object(browser)
+    fill_place_in_form(place, page)
+
+
 hotel_fields = HotelFields()
-places = get_file_content("places.txt")
-place = places[3]
-# logger.info(f"Found {len(places)} places in file provided.")
-# TODO: only open browser if we have places to work with
-
-playwright = sync_playwright().start()
-browser = playwright.chromium.launch(headless=False, slow_mo=250)
-page = get_page_object(browser)
-
-goto_url(TRIP_ADVISOR_HOMEPAGE, page, "domcontentloaded")
-time.sleep(1.5)
-page.query_selector("footer").scroll_into_view_if_needed()
-time.sleep(2)
-
-form_role_search = page.query_selector("form[role='search']")
-search = form_role_search.query_selector("input[type='search']")
-search.fill(f"{place} hotels")
-time.sleep(5)
-
-typeahead_results = page.query_selector("div#typeahead_results")
-href = typeahead_results.query_selector("a").get_attribute("href")
-goto_url(f"{TRIP_ADVISOR_HOMEPAGE}{href}", page)
-
-hrefs = get_all_listings_from_page(page)
-get_hotel_data(hrefs, page)
+main()
