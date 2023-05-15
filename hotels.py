@@ -140,6 +140,7 @@ def get_hotel_phone(page: Page, hotel_dict: dict) -> None:
 
 
 def get_hotel_images(page: Page, hotel_dict: dict) -> None:
+    """TO FIX: Invalid URL 'None': No scheme supplied. Perhaps you meant http://None?"""
     images = list()
     photo_viewer = page.query_selector('div[data-section-signature="photo_viewer"]')
     image_links = photo_viewer.query_selector_all("img")
@@ -174,14 +175,13 @@ def get_hotel_data(listing_hrefs: list, page: Page) -> None:
         get_hotel_website(page, hotel_dict)
         get_hotel_phone(page, hotel_dict)
         get_hotel_images(page, hotel_dict)
-        # TODO: remove the hardcoded document name
-        # put it in the .env file, like the database name
+        # TODO: remove the hardcoded document name; put it in the .env file, like the database name
         database[f"tetsing{place}"].insert_one(hotel_dict)
 
 
 hotel_fields = HotelFields()
 places = get_file_content("places.txt")
-place = places[1]
+place = places[3]
 # logger.info(f"Found {len(places)} places in file provided.")
 # TODO: only open browser if we have places to work with
 
@@ -189,15 +189,16 @@ playwright = sync_playwright().start()
 browser = playwright.chromium.launch(headless=False, slow_mo=250)
 page = get_page_object(browser)
 
-goto_url(TRIP_ADVISOR_HOMEPAGE, page)
-
+goto_url(TRIP_ADVISOR_HOMEPAGE, page, "domcontentloaded")
+time.sleep(1.5)
 page.query_selector("footer").scroll_into_view_if_needed()
+time.sleep(2)
 
 form_role_search = page.query_selector("form[role='search']")
 search = form_role_search.query_selector("input[type='search']")
 search.fill(f"{place} hotels")
+time.sleep(5)
 
-time.sleep(2.5)
 typeahead_results = page.query_selector("div#typeahead_results")
 href = typeahead_results.query_selector("a").get_attribute("href")
 goto_url(f"{TRIP_ADVISOR_HOMEPAGE}{href}", page)
